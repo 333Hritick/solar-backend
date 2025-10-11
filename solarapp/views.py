@@ -24,7 +24,7 @@ def create_quote(request):
     serializer = QuoteRequestSerializer(data=request.data)
     
     if serializer.is_valid():
-        quote = serializer.save()  # <-- Save and get the instance
+        quote = serializer.save()  # Save instance
 
         # Prepare Telegram message
         message = (
@@ -32,16 +32,19 @@ def create_quote(request):
             f"👤 Name: {quote.name}\n"
             f"📧 Email: {quote.email}\n"
             f"📞 Phone: {quote.phone}\n"
-            f"🏙️ district: {quote.district}\n"
+            f"🏙️ District: {quote.district}\n"
             f"💵 Monthly Bill: {quote.monthlyBill}\n"
             f"🏠 Rooftop Area: {quote.rooftopArea}\n"
             f"💬 Message: {quote.message or 'N/A'}\n"
-            f"🕒 Submitted at: {quote.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"🕒 Submitted at: {quote.created_at.strftime('%Y-%m-%d %H:%M:%S') if quote.created_at else 'N/A'}"
         )
-        # Send Telegram message
-        send_telegram_message(message)
-        
-        
+
+        # Send Telegram safely
+        try:
+            send_telegram_message(message)
+        except Exception as e:
+            # Log the error, but don’t crash the API
+            print(f"Telegram error: {e}")
 
         return Response(
             {"message": "Quote request submitted successfully!"},
@@ -49,10 +52,12 @@ def create_quote(request):
         )
        
     else:
+        # Return serializer errors
         return Response(
            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
+           status=status.HTTP_400_BAD_REQUEST
         )
+
 
 def home(request):
     return JsonResponse({"message": "Solar Backend API is running ✅"})
