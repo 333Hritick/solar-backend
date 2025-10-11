@@ -4,6 +4,7 @@ from rest_framework import status
 from .models import QuoteRequest
 from .serializers import QuoteRequestSerializer
 import requests
+from django.http import JsonResponse
 
 TELEGRAM_BOT_TOKEN = "8084652463:AAGUVvnvNoNMQmEocqpROaFKqgHgP-C86ho"
 TELEGRAM_CHAT_ID = "5698737028"
@@ -52,3 +53,6 @@ def create_quote(request):
            serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
         )
+
+def home(request):
+    return JsonResponse({"message": "Solar Backend API is running ✅"})
