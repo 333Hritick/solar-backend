@@ -94,3 +94,25 @@ USE_TZ = True
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# settings.py
+SECURE_CONTENT_TYPE_NOSNIFF = True
+CSP_DEFAULT_SRC = ("'self'", )
+CSP_SCRIPT_SRC = ("'self'", "https://trusted.cdn.com")
+CSP_STYLE_SRC = ("'self'", "https://trusted.cdn.com")
+
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+X_FRAME_OPTIONS = 'DENY'  # or 'SAMEORIGIN'
+
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
+
+
+
+
