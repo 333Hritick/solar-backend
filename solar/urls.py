@@ -23,6 +23,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/',include('solarapp.urls')),
     path('', home),  
+
    
 
 ]
