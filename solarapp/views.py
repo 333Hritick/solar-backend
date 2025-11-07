@@ -5,6 +5,8 @@ from .models import QuoteRequest
 from .serializers import QuoteRequestSerializer
 import requests
 from django.http import JsonResponse
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 
 TELEGRAM_BOT_TOKEN = "8084652463:AAGUVvnvNoNMQmEocqpROaFKqgHgP-C86ho"
 TELEGRAM_CHAT_ID = "5698737028"
@@ -92,3 +94,28 @@ def calculate_emi(request):
         "total_interest": round(total_interest, 2),
         "total_payment": round(total_payment, 2)
     })
+    
+    # login and register
+@api_view(['POST'])
+def register_user(request):
+    username = request.data.get('username')
+    email = request.data.get('email')
+    password = request.data.get('password')
+
+    if User.objects.filter(username=username).exists():
+        return Response({'error': 'Username already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.create_user(username=username, email=email, password=password)
+    user.save()
+    return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+def login_user(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    user = authenticate(username=username, password=password)
+    if user is not None:
+        return Response({'message': 'Login successful', 'username': username}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
