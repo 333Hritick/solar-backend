@@ -7,4 +7,5 @@ django-cors-headers
 dj-database-url
 requests
 python-dotenv
+channels_redis
   
