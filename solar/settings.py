@@ -15,7 +15,7 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-PLACEHOLDER_KEY')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = ['*']  # Later you can restrict
+ALLOWED_HOSTS = ['*']  
 
 
 INSTALLED_APPS = [
@@ -75,13 +75,21 @@ TEMPLATES = [
     },
 ]
 
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.getenv('DATABASE_URL')
-    )
-}
-
+if DATABASE_URL:
+    # Use Aiven / Production DB
+    DATABASES = {
+        'default': dj_database_url.config(default=DATABASE_URL)
+    }
+else:
+    # Use Local SQLite DB
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -125,6 +133,11 @@ CHANNEL_LAYERS = {
     },
 }
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
 
 
 

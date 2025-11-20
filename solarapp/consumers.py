@@ -1,18 +1,31 @@
+from channels.generic.websocket import AsyncWebsocketConsumer
+import asyncio
 import json
 import random
-from asyncio import sleep
-from channels.generic.websocket import AsyncWebsocketConsumer
 
 class EnergyConsumer(AsyncWebsocketConsumer):
+
     async def connect(self):
+        print("CLIENT CONNECTED")
         await self.accept()
-        # send random energy data every 3 seconds
-        while True:
+
+        self.active = True
+        self.loop_task = asyncio.create_task(self.stream_data())
+
+    async def disconnect(self, close_code):
+        print("CLIENT DISCONNECTED")
+        self.active = False
+        if hasattr(self, "loop_task"):
+            self.loop_task.cancel()
+
+    async def stream_data(self):
+        while self.active:
             data = {
-                "production": round(random.uniform(40, 60), 2),
-                "consumption": round(random.uniform(25, 45), 2),
-                "surplus": round(random.uniform(10, 20), 2),
-                "credits": round(random.uniform(100, 200), 2),
+                "production": round(random.uniform(40, 50), 1),
+                "consumption": round(random.uniform(30, 35), 1),
+                "surplus": round(random.uniform(10, 15), 1),
+                "credits": round(random.uniform(150, 160), 2)
             }
+
             await self.send(json.dumps(data))
-            await sleep(3)
+            await asyncio.sleep(2)

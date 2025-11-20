@@ -1,6 +1,6 @@
-from django.urls import re_path
-from . import consumers  # this will refer to solarapp/consumers.py
+from django.urls import path
+from . import consumers
 
 websocket_urlpatterns = [
-    re_path(r'ws/energy/$', consumers.EnergyConsumer.as_asgi()),
+    path("ws/energy/", consumers.EnergyConsumer.as_asgi()),
 ]
