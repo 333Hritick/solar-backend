@@ -17,6 +17,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-PLACEHOLDER_KEY')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = ['*']  
 
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -33,14 +34,22 @@ INSTALLED_APPS = [
 
     'corsheaders',
     'rest_framework',
+    'rest_framework_simplejwt',
     'channels',
 ]
 
 
 CORS_ALLOW_ALL_ORIGINS = True 
 
+CORS_ALLOW_HEADERS = [
+    'authorization',
+    'content-type',
+]
+
 CORS_ALLOWED_ORIGINS = [
     "https://solarfrontend.onrender.com",
+     "http://localhost:5173",
+    "http://localhost:5174",
 ]
 
 MIDDLEWARE = [
@@ -78,12 +87,12 @@ TEMPLATES = [
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL:
-    # Use Aiven / Production DB
+    # Railway database i am using
     DATABASES = {
         'default': dj_database_url.config(default=DATABASE_URL)
     }
 else:
-    # Use Local SQLite DB
+    #  Local SqLite DB
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -107,7 +116,7 @@ USE_TZ = True
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-# settings.py
+
 SECURE_CONTENT_TYPE_NOSNIFF = True
 CSP_DEFAULT_SRC = ("'self'", )
 CSP_SCRIPT_SRC = ("'self'", "https://trusted.cdn.com")
@@ -115,9 +124,9 @@ CSP_STYLE_SRC = ("'self'", "https://trusted.cdn.com")
 
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
-X_FRAME_OPTIONS = 'DENY'  # or 'SAMEORIGIN'
+X_FRAME_OPTIONS = 'DENY' 
 
-SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_SECONDS = 31536000  
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
@@ -138,7 +147,21 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),  # ← ADD THIS
+}
 
+AUTHENTICATION_BACKENDS = [
+    'solarapp.auth_backend.EmailAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',   # keep default
+]
 
 
 

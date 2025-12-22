@@ -6,11 +6,16 @@ from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import QuoteRequest
-from .serializers import QuoteRequestSerializer
-
+from .models import Profile
+from .serializers import QuoteRequestSerializer,EnergyOrderSerializer
 import requests
+import random
+from .weather_api import get_forecast
+from .prediction import simple_predict
+from .models import EnergyOrder, EnergyToken
+import threading
 
 
 
@@ -18,15 +23,14 @@ TELEGRAM_BOT_TOKEN = "8084652463:AAGUVvnvNoNMQmEocqpROaFKqgHgP-C86ho"
 TELEGRAM_CHAT_ID = "5698737028"
 
 
-def send_telegram_message(message: str):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message
-    }
-    response = requests.post(url, data=data)
-    return response.json()
-
+def send_telegram_async(message: str):
+    """Send telegram message in background thread"""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+        requests.post(url, data=data)
+    except Exception as e:
+        print("Telegram Error:", e)
 
 
 @api_view(['POST'])
@@ -48,11 +52,10 @@ def create_quote(request):
             f"🕒 Submitted at: {quote.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
-        try:
-            send_telegram_message(message)
-        except Exception as e:
-            print(f"Telegram error: {e}")
+        # 🚀 Send message in background (fast)
+        threading.Thread(target=send_telegram_async, args=(message,)).start()
 
+        # ⚡ Respond immediately (no waiting for Telegram)
         return Response(
             {"message": "Quote request submitted successfully!"},
             status=status.HTTP_201_CREATED
@@ -100,41 +103,118 @@ def calculate_emi(request):
 
 @api_view(['POST'])
 def register_user(request):
-    username = request.data.get('username')
+    name = request.data.get('name')
     email = request.data.get('email')
+    phone = request.data.get('phone')
     password = request.data.get('password')
+    address = request.data.get('address')
+    accounttype = request.data.get('accounttype')
 
-    if User.objects.filter(username=username).exists():
-        return Response({'error': 'Username already exists'}, status=status.HTTP_400_BAD_REQUEST)
+    if User.objects.filter(email=email).exists():
+        return Response({'error': 'Email already exists'}, status=400)
 
-    user = User.objects.create_user(username=username, email=email, password=password)
-    user.save()
+    
+    user = User.objects.create_user(
+        username=email,   
+        email=email,
+        password=password,
+        first_name=name
+    )
 
-    return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+   
+    profile = user.profile
+    profile.phone = phone
+    profile.address = address
+    profile.accounttype = accounttype
+    profile.save()
 
-
+    return Response({"message": "User registered successfully"}, status=201)
 
 @api_view(['POST'])
 def login_user(request):
-    username = request.data.get('username')
+    email = request.data.get('email')
     password = request.data.get('password')
 
-    user = authenticate(username=username, password=password)
+    user = authenticate(username=email, password=password)
+    if not user:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    if user is not None:
-        return Response({'message': 'Login successful', 'username': username}, status=status.HTTP_200_OK)
+    refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
 
-    return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
+    return Response({
+        'name': user.first_name,
+        'email': user.email,
+        'access': access_token,
+        'refresh': str(refresh)
+    })
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_profile(request):
     user = request.user
+    profile = Profile.objects.get(user=user)
 
-    return Response({
+    data = {
         "name": user.first_name,
         "email": user.email,
-        "username": user.username,
+        "phone": profile.phone,
+        "address": profile.address,
+        "accounttype": profile.accounttype
+    }
+
+    return Response(data)
+
+
+
+@api_view(['GET'])
+def next_day_energy(request):
+    today_prod = round(random.uniform(40, 50), 1)
+    weather = get_forecast("Dehradun")
+    predicted = simple_predict(today_prod, weather["sunlight"])
+
+    print("DEBUG WEATHER:", weather)
+
+
+    return Response({
+        "today_production": today_prod,
+        "weather": weather,
+        "predicted_next_day": predicted
     })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_order(request):
+    user = request.user
+    amount = request.data.get("amount")
+    price = request.data.get("price")
+    order_type = request.data.get("order_type")
+
+    order = EnergyOrder.objects.create(
+        user=user,
+        amount=amount,
+        price=price,
+        order_type=order_type,
+        renewable_type="Solar"
+    )
+
+    return Response({"message": "Order created", "order_id": order.id})
+
+
+@api_view(['GET'])
+def get_offers(request):
+    offers = EnergyOrder.objects.filter(is_active=True)
+    serializer = EnergyOrderSerializer(offers, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def execute_trade(request, order_id):
+    try:
+        order = EnergyOrder.objects.get(id=order_id)
+        order.is_active = False
+        order.save()
+        return Response({"message": "Trade executed successfully"})
+    except EnergyOrder.DoesNotExist:
+        return Response({"error": "Order not found"}, status=404)
