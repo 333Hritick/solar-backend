@@ -9,7 +9,7 @@ class QuoteRequestSerializer(serializers.ModelSerializer):
         fields = ['name', 'email', 'phone', 'district', 'monthlyBill', 'rooftopArea', 'message']
 
         model=Profile
-        fields = ['name', 'email', 'phone', 'address', 'accounttype']
+        fields = ['user', 'email', 'phone', 'address', 'accounttype']
 
 class EnergyOrderSerializer(serializers.ModelSerializer):
     class Meta:
