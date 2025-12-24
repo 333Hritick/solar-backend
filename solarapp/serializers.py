@@ -1,15 +1,26 @@
 from rest_framework import serializers
-from.models import QuoteRequest
-from.models import Profile
-from .models import EnergyOrder
+from .models import QuoteRequest, Profile, EnergyOrder
+
 
 class QuoteRequestSerializer(serializers.ModelSerializer):
     class Meta:
-        model=QuoteRequest
-        fields = ['name', 'email', 'phone', 'district', 'monthlyBill', 'rooftopArea', 'message']
+        model = QuoteRequest
+        fields = [
+            'name',
+            'email',
+            'phone',
+            'district',
+            'monthlyBill',
+            'rooftopArea',
+            'message'
+        ]
 
-        model=Profile
-        fields = ['user', 'phone', 'address', 'accounttype']
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ['phone', 'address', 'accounttype']
+
 
 class EnergyOrderSerializer(serializers.ModelSerializer):
     class Meta:
