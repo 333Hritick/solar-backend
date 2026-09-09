@@ -137,27 +137,6 @@ def register_user(request):
 
     return Response({"message": "User registered successfully"}, status=201)
 
-@api_view(['POST'])
-def login_user(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
-
-    # ✅ Use EmailAuthBackend (authenticate with email)
-    user = authenticate(request, email=email, password=password)
-
-    if not user:
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    # ✅ Generate JWT tokens
-    refresh = RefreshToken.for_user(user)
-    access_token = str(refresh.access_token)
-
-    return Response({
-        'name': user.first_name,
-        'email': user.email,
-        'access': access_token,
-        'refresh': str(refresh)
-    })
 
 
 @api_view(['GET'])
