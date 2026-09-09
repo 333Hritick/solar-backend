@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    create_quote, register_user, login_user, calculate_emi,
+    create_quote, register_user, calculate_emi,
     user_profile, energypredict, create_order, get_offers,
     execute_trade, register_device, post_production, mydata
 )
