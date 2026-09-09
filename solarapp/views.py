@@ -21,6 +21,7 @@ import os,uuid
 from .models import Device, ProductionData
 from django.db import IntegrityError
 
+
 TELEGRAM_BOT_TOKEN = "8084652463:AAGUVvnvNoNMQmEocqpROaFKqgHgP-C86ho"
 TELEGRAM_CHAT_ID = "5698737028"
 
