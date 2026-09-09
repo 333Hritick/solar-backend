@@ -5,7 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 
 from django.http import JsonResponse
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import QuoteRequest
 from .models import Profile
@@ -16,11 +17,15 @@ from .weather_api import get_forecast
 from .prediction import simple_predict
 from .models import EnergyOrder, EnergyToken
 import threading
-
-
+import os,uuid
+from .models import Device, ProductionData
+from django.db import IntegrityError
 
 TELEGRAM_BOT_TOKEN = "8084652463:AAGUVvnvNoNMQmEocqpROaFKqgHgP-C86ho"
 TELEGRAM_CHAT_ID = "5698737028"
+
+
+User = get_user_model()
 
 
 def send_telegram_async(message: str):
@@ -110,18 +115,19 @@ def register_user(request):
     address = request.data.get('address')
     accounttype = request.data.get('accounttype')
 
+    # ✅ Use User model, not settings.AUTH_USER_MODEL string
     if User.objects.filter(email=email).exists():
         return Response({'error': 'Email already exists'}, status=400)
 
-    
+    # ✅ Create user properly
     user = User.objects.create_user(
-        username=email,   
+        username=email,
         email=email,
         password=password,
         first_name=name
     )
 
-   
+    # ✅ Update profile
     profile = user.profile
     profile.phone = phone
     profile.address = address
@@ -135,10 +141,13 @@ def login_user(request):
     email = request.data.get('email')
     password = request.data.get('password')
 
-    user = authenticate(username=email, password=password)
+    # ✅ Use EmailAuthBackend (authenticate with email)
+    user = authenticate(request, email=email, password=password)
+
     if not user:
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
+    # ✅ Generate JWT tokens
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
 
@@ -155,32 +164,118 @@ def login_user(request):
 def user_profile(request):
     user = request.user
     profile = Profile.objects.get(user=user)
+    devices = Device.objects.filter(user=user)
 
     data = {
         "name": user.first_name,
         "email": user.email,
         "phone": profile.phone,
         "address": profile.address,
-        "accounttype": profile.accounttype
+        "accounttype": profile.accounttype,
+        "devices": [
+            {
+                "id": d.id,
+                "name": d.name,
+                "status": d.status,
+                "token": d.token,
+                "serial_number": d.serial_number,
+                "location": d.location,
+                "capacity_kw": d.capacity_kw,
+                "installation_date": d.installation_date,
+                "manufacturer": d.manufacturer,
+                "description": d.description,
+            }
+            for d in devices
+        ]
     }
 
     return Response(data)
 
 
 
-@api_view(['GET'])
-def next_day_energy(request):
+API_KEY = os.getenv("WEATHER_API_KEY")
+
+def get_forecast(city="Dehradun"):
+    url = (
+        f"https://api.openweathermap.org/data/2.5/forecast?"
+        f"q={city}&appid={API_KEY}&units=metric"
+    )
+    try:
+        response = requests.get(url).json()
+
+        # Defensive checks
+        if "list" not in response or len(response["list"]) < 9:
+            return {"temp": 25, "humidity": 50, "clouds": 20, "sunlight": 80}
+
+        next_day = response["list"][8]  # ~24h later
+        return {
+            "temp": next_day["main"]["temp"],
+            "humidity": next_day["main"]["humidity"],
+            "clouds": next_day["clouds"]["all"],
+            "sunlight": 100 - next_day["clouds"]["all"],
+        }
+    except Exception as e:
+        print("Weather API error:", e)
+        return {"temp": 25, "humidity": 50, "clouds": 20, "sunlight": 80}
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def register_device(request):
+    """Generate random token for user’s device"""
+    token = uuid.uuid4().hex
+    device = Device.objects.create(
+        user=request.user,
+        name=request.data.get("name", "My Inverter"),
+        token=token
+    )
+    return Response({"device_id": device.id, "token": device.token})
+
+@api_view(["POST"])
+def post_production(request):
+    """ESP32 or simulator posts production data with token"""
+    token = request.data.get("token")
+    production = request.data.get("production")
+    try:
+        device = Device.objects.get(token=token)
+        ProductionData.objects.create(device=device, production=production)
+        return Response({"status": "ok", "production": production})
+    except Device.DoesNotExist:
+        return Response({"error": "Invalid device token"}, status=400)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def mydata(request):
+    """Return production history for logged-in user"""
+    devices = Device.objects.filter(user=request.user)
+    data = ProductionData.objects.filter(device__in=devices).order_by("-timestamp")[:20]
+    return Response([{"production": d.production, "timestamp": d.timestamp} for d in data])
+
+
+
+
+
+
+@api_view(["GET"])
+def energypredict(request):
+    # Simulate today’s production
     today_prod = round(random.uniform(40, 50), 1)
+    consumption = round(today_prod * 0.7, 1)
+    surplus = round(today_prod - consumption, 1)
+
+    # Get tomorrow’s forecast
     weather = get_forecast("Dehradun")
-    predicted = simple_predict(today_prod, weather["sunlight"])
+    sunlight = weather.get("sunlight", 50)
 
-    print("DEBUG WEATHER:", weather)
-
+    # Simple prediction formula
+    predicted_next_day = round(today_prod * (0.7 + sunlight/100 * 0.3), 1)
 
     return Response({
         "today_production": today_prod,
+        "consumption": consumption,
+        "surplus": surplus,
+        "credits": round(predicted_next_day * 10, 1),
         "weather": weather,
-        "predicted_next_day": predicted
+        "predicted_next_day": predicted_next_day
     })
 
 @api_view(['POST'])
@@ -218,3 +313,29 @@ def execute_trade(request, order_id):
         return Response({"message": "Trade executed successfully"})
     except EnergyOrder.DoesNotExist:
         return Response({"error": "Order not found"}, status=404)
+
+
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def register_device(request):
+    try:
+        token = uuid.uuid4().hex
+        device = Device.objects.create(
+            user=request.user,
+            name=request.data.get("name", f"{request.user.first_name}'s Inverter"),
+            token=token,
+            serial_number=request.data.get("serial_number"),
+            location=request.data.get("location"),
+            capacity_kw=request.data.get("capacity_kw") or None,
+            installation_date=request.data.get("installation_date") or None,
+            manufacturer=request.data.get("manufacturer"),
+            description=request.data.get("description")
+        )
+        return Response({"message": "Device registered successfully", "device_id": device.id})
+    except IntegrityError:
+        return Response({"error": "Serial number already registered"}, status=400)
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)

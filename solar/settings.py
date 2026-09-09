@@ -30,6 +30,7 @@ INSTALLED_APPS = [
 
 
     'solarapp',
+    'notifications',
 
 
     'corsheaders',
@@ -39,12 +40,13 @@ INSTALLED_APPS = [
 ]
 
 
-CORS_ALLOW_ALL_ORIGINS = True 
+CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOW_HEADERS = [
     'authorization',
     'content-type',
 ]
+CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
     "https://solarfrontend.onrender.com",
@@ -112,6 +114,8 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# settings.py
+AUTH_USER_MODEL = "solarapp.User"
 
 
 
@@ -162,6 +166,12 @@ AUTHENTICATION_BACKENDS = [
     'solarapp.auth_backend.EmailAuthBackend',
     'django.contrib.auth.backends.ModelBackend',   # keep default
 ]
+
+
+
+CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/0"
+
 
 
 
