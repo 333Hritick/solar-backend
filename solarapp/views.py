@@ -116,19 +116,16 @@ def register_user(request):
     address = request.data.get('address')
     accounttype = request.data.get('accounttype')
 
-    # ✅ Use User model, not settings.AUTH_USER_MODEL string
     if User.objects.filter(email=email).exists():
         return Response({'error': 'Email already exists'}, status=400)
 
-    # ✅ Create user properly
     user = User.objects.create_user(
-        username=email,
+        username=email,  # still required by AbstractUser
         email=email,
         password=password,
         first_name=name
     )
 
-    # ✅ Update profile
     profile = user.profile
     profile.phone = phone
     profile.address = address
@@ -136,7 +133,6 @@ def register_user(request):
     profile.save()
 
     return Response({"message": "User registered successfully"}, status=201)
-
 
 
 @api_view(['GET'])
@@ -168,7 +164,6 @@ def user_profile(request):
             for d in devices
         ]
     }
-
     return Response(data)
 
 
